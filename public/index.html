@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专业抽奖系统 - 豪华动效版</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root { --primary: #4f46e5; --danger: #ef4444; --success: #22c55e; --bg: #f3f4f6; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); margin: 0; display: flex; justify-content: center; padding: 20px; }
+        .app-container { width: 100%; max-width: 600px; background: white; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* 抽奖区豪华升级 */
+        .draw-section { 
+            padding: 50px 20px; 
+            text-align: center; 
+            /* 加深背景，让高光更明显 */
+            background: radial-gradient(circle, #4f46e5 0%, #312e81 100%); 
+            color: white; 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #display-name { 
+            font-size: 3.5rem; 
+            font-weight: 900; 
+            margin: 20px 0; 
+            height: 6rem; 
+            display: flex;
+            flex-direction: column;
+            align-items: center; 
+            justify-content: center; 
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+
+        /* 滚动时的残影效果 */
+        .rolling-text {
+            filter: blur(1px);
+            opacity: 0.8;
+            transform: scale(0.95);
+        }
+
+        /* 中奖者的聚光灯效果 */
+        .winner-text {
+            color: #ffd700; /* 土豪金 */
+            text-shadow: 0 0 20px #ffd700, 0 0 40px #ff8c00;
+            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* 递话筒的专属动画 */
+        .mic-wrapper {
+            margin-top: 15px;
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: none;
+            opacity: 0;
+            transform: translateY(30px) scale(0.5) rotate(-20deg);
+            animation: handMic 0.8s 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes handMic {
+            0% { transform: translateY(30px) scale(0.5) rotate(-20deg); opacity: 0; }
+            70% { transform: translateY(-10px) scale(1.2) rotate(10deg); opacity: 1; }
+            100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        /* 以下是原本的管理区样式，保持不变 */
+        .manage-section { padding: 24px; flex-grow: 1; }
+        .input-group { display: flex; gap: 8px; margin-bottom: 20px; }
+        input[type="text"] { flex-grow: 1; padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 8px; outline: none; font-size: 1rem;}
+        input[type="text"]:focus { border-color: var(--primary); }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-draw { background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); color: white; font-size: 1.3rem; padding: 15px 40px; box-shadow: 0 8px 20px rgba(234, 88, 12, 0.4); border-radius: 50px; border: 2px solid #fff;}
+        .btn-draw:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(234, 88, 12, 0.6); }
+        .btn-draw.stop { background: var(--danger); box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4); }
+        .candidate-list { list-style: none; padding: 0; max-height: 300px; overflow-y: auto; }
+        .candidate-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f3f4f6; }
+        .actions { display: flex; gap: 8px; }
+        .btn-sm { padding: 4px 10px; font-size: 0.85rem; border-radius: 4px; }
+        .edit-btn { color: var(--primary); background: #eef2ff; }
+        .del-btn { color: var(--danger); background: #fef2f2; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="draw-section">
+        <div id="display-name">连接服务器中...</div>
+        <button id="draw-btn" class="btn btn-draw" onclick="handleDraw()" disabled>等待数据</button>
+    </div>
+
+    <div class="manage-section">
+        <h3>成员管理 (<span id="count">0</span>)</h3>
+        <div class="input-group">
+            <input type="text" id="name-input" placeholder="输入姓名..." onkeydown="if(event.key==='Enter')addCandidate()">
+            <button class="btn btn-primary" onclick="addCandidate()">添加</button>
+        </div>
+        <ul id="list" class="candidate-list"></ul>
+        <button class="btn del-btn" style="width: 100%; margin-top: 15px;" onclick="clearAll()">清空所有名单</button>
+    </div>
+</div>
+
+<script>
+    let candidates = [];
+    let isRolling = false;
+    let timer = null;
+
+    // 从服务器拉取数据
+    async function loadDataFromServer() {
+        try {
+            const response = await fetch('/api/candidates');
+            candidates = await response.json();
+            document.getElementById('display-name').innerText = "准备就绪";
+            document.getElementById('draw-btn').disabled = false;
+            renderList();
+        } catch (error) {
+            document.getElementById('display-name').innerText = "数据拉取失败";
+        }
+    }
+
+    // 将最新数据推送到服务器
+    async function syncDataToServer() {
+        try {
+            await fetch('/api/candidates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ candidates })
+            });
+            renderList();
+        } catch (error) {
+            alert('同步失败！');
+        }
+    }
+
+    // 渲染列表界面
+    function renderList() {
+        document.getElementById('count').innerText = candidates.length;
+        const listEl = document.getElementById('list');
+        listEl.innerHTML = '';
+        candidates.forEach((name, index) => {
+            const li = document.createElement('li');
+            li.className = 'candidate-item';
+            li.innerHTML = `<span>${name}</span><div class="actions"><button class="btn btn-sm edit-btn" onclick="editCandidate(${index})">改</button><button class="btn btn-sm del-btn" onclick="deleteCandidate(${index})">删</button></div>`;
+            listEl.appendChild(li);
+        });
+    }
+
+    function addCandidate() { const input = document.getElementById('name-input'); if (input.value.trim()) { candidates.push(input.value.trim()); input.value = ''; syncDataToServer(); } }
+    function deleteCandidate(index) { candidates.splice(index, 1); syncDataToServer(); }
+    function editCandidate(index) { const newName = prompt("修改姓名：", candidates[index]); if (newName && newName.trim()) { candidates[index] = newName.trim(); syncDataToServer(); } }
+    function clearAll() { if(confirm("确定要清空吗？")) { candidates = []; syncDataToServer(); } }
+
+    function getSecureRandomIndex(max) {
+        const array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+        return array[0] % max;
+    }
+
+    // 触发炫酷撒花特效的函数
+    function fireConfetti() {
+        var count = 200;
+        var defaults = { origin: { y: 0.7 }, zIndex: 100 };
+        function fire(particleRatio, opts) {
+            confetti(Object.assign({}, defaults, opts, { particleCount: Math.floor(count * particleRatio) }));
+        }
+        fire(0.25, { spread: 26, startVelocity: 55 });
+        fire(0.2, { spread: 60 });
+        fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+        fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+        fire(0.1, { spread: 120, startVelocity: 45 });
+    }
+
+    // 抽奖逻辑
+    function handleDraw() {
+        if (candidates.length < 1) return alert("名单为空，请先添加成员！");
+        const btn = document.getElementById('draw-btn');
+        const display = document.getElementById('display-name');
+
+        if (!isRolling) {
+            isRolling = true;
+            btn.innerText = "停止并揭晓！";
+            btn.classList.add('stop');
+            
+            // 快速滚动时的残影效果
+            display.className = 'rolling-text';
+            
+            timer = setInterval(() => {
+                const randomName = candidates[Math.floor(Math.random() * candidates.length)];
+                display.innerText = randomName;
+            }, 40);
+        } else {
+            isRolling = false;
+            clearInterval(timer);
+            btn.innerText = "再次抽奖";
+            btn.classList.remove('stop');
+            
+            const winnerIndex = getSecureRandomIndex(candidates.length);
+            const winner = candidates[winnerIndex];
+            
+            // 清除残影类名
+            display.className = '';
+            // 注入中奖者的 HTML：带发光特效的名字 + 递话筒动画
+            display.innerHTML = `
+                <div class="winner-text">👑 ${winner} 👑</div>
+                <div class="mic-wrapper">🎤 恭喜下周的主持人！</div>
+            `;
+            
+            // 触发全屏撒花
+            fireConfetti();
+        }
+    }
+
+    window.onload = loadDataFromServer;
+</script>
+
+</body>
+</html>
