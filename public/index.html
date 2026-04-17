@@ -3,160 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>专业抽奖系统 - 豪华动效版</title>
+    <title>狂欢打地鼠抽奖系统</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        :root { --primary: #4f46e5; --danger: #ef4444; --success: #22c55e; --bg: #f3f4f6; }
-        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); margin: 0; display: flex; justify-content: center; padding: 20px; }
-        .app-container { width: 100%; max-width: 600px; background: white; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; }
-        
-        /* 抽奖区豪华升级 */
-        .draw-section { 
-            padding: 50px 20px; 
-            text-align: center; 
-            /* 加深背景，让高光更明显 */
-            background: radial-gradient(circle, #4f46e5 0%, #312e81 100%); 
-            color: white; 
-            position: relative;
-            overflow: hidden;
+        :root { 
+            --primary: #4ade80; 
+            --bg-dark: #0f172a;
+            --dirt-color: #3f2a1d;
+            --dirt-shadow: #291b12;
+            --mole-color: #8b5a2b;
+            --gold: #ffd700;
         }
         
-        #display-name { 
-            font-size: 3.5rem; 
-            font-weight: 900; 
-            margin: 20px 0; 
-            height: 6rem; 
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); color: #fff; height: 100vh; display: flex; overflow: hidden; }
+
+        /* 左侧管理面板 */
+        .sidebar { width: 320px; background: rgba(15, 23, 42, 0.95); border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; transition: transform 0.3s; z-index: 100; box-shadow: 5px 0 20px rgba(0,0,0,0.5); }
+        .sidebar.collapsed { transform: translateX(-100%); position: absolute; height: 100%; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-header h2 { margin: 0; font-size: 1.2rem; color: var(--primary); }
+        .toggle-btn { background: none; border: none; color: #fff; cursor: pointer; opacity: 0.6; transition: 0.2s; }
+        .toggle-btn:hover { opacity: 1; color: var(--primary); }
+        #show-sidebar-btn { position: absolute; top: 20px; left: 20px; z-index: 50; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 15px; border-radius: 8px; cursor: pointer; backdrop-filter: blur(5px); display: none; }
+        #show-sidebar-btn.visible { display: block; }
+
+        .manage-area { padding: 20px; display: flex; flex-direction: column; gap: 15px; flex-grow: 1; overflow-y: auto; }
+        .input-group { display: flex; gap: 8px; }
+        input[type="text"] { flex-grow: 1; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; outline: none; }
+        input[type="text"]:focus { border-color: var(--primary); }
+        .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; color: #fff; }
+        .btn-add { background: var(--primary); color: #000; }
+        .btn-add:hover { background: #22c55e; }
+        .btn-danger { background: rgba(255, 0, 0, 0.2); border: 1px solid rgba(255, 0, 0, 0.4); margin-top: auto; }
+        .btn-danger:hover { background: rgba(255, 0, 0, 0.4); }
+
+        .list-wrap { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(255,255,255,0.05); border-radius: 6px; border-left: 3px solid transparent; }
+        .list-item:hover { background: rgba(255,255,255,0.1); border-left-color: var(--primary); }
+        .item-actions button { background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer; padding: 4px; }
+        .item-actions button:hover { color: #fff; }
+
+        /* 右侧大屏抽奖区 - 草地地鼠洞 */
+        .main-arena { flex-grow: 1; position: relative; display: flex; flex-direction: column; padding: 40px; background: radial-gradient(ellipse at bottom, #166534 0%, #064e3b 50%, #022c22 100%); overflow: hidden;}
+        
+        .grass-field { 
+            flex-grow: 1; 
+            display: flex; 
+            flex-wrap: wrap; 
+            align-content: center; 
+            justify-content: center; 
+            gap: 20px 40px; 
+            padding-bottom: 120px; 
+            overflow-y: auto;
+            perspective: 1000px;
+        }
+
+        /* --- 地鼠与洞穴的 CSS 核心 --- */
+        .hole-container {
+            position: relative;
+            width: 130px;
+            height: 150px;
             display: flex;
             flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* 泥土洞口 */
+        .dirt-hole {
+            width: 110px;
+            height: 35px;
+            background: var(--dirt-color);
+            border-radius: 50%;
+            position: absolute;
+            bottom: 0;
+            box-shadow: inset 0 10px 10px rgba(0,0,0,0.6), 0 5px 0 var(--dirt-shadow);
+            z-index: 3;
+        }
+
+        /* 地鼠隐藏的面罩 */
+        .mole-mask {
+            position: absolute;
+            width: 130px;
+            height: 120px;
+            bottom: 15px; 
+            overflow: hidden; 
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            border-radius: 60px 60px 0 0;
+        }
+
+        /* 呆萌地鼠本体 */
+        .mole {
+            width: 90px;
+            height: 110px;
+            background: var(--mole-color);
+            border-radius: 45px 45px 0 0;
+            position: absolute;
+            bottom: -110px; 
+            transition: bottom 0.15s ease-out, background 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 15px;
+            box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3);
+        }
+
+        /* 地鼠五官 */
+        .mole-eyes { display: flex; gap: 18px; margin-bottom: 8px; }
+        .eye { width: 10px; height: 10px; background: #000; border-radius: 50%; box-shadow: -1px -1px 2px rgba(255,255,255,0.4); }
+        .mole-nose { width: 16px; height: 10px; background: #fb7185; border-radius: 50%; margin-bottom: 12px; }
+        
+        /* 肚子上的名字区域 (已修复长名字自动换行) */
+        .mole-belly {
+            background: rgba(255,255,255,0.2);
+            width: 90%; 
+            border-radius: 10px 10px 0 0;
+            padding: 6px 4px;
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
             align-items: center; 
-            justify-content: center; 
-            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transition: all 0.3s;
+        }
+        
+        .mole-name { 
+            font-size: 11px; 
+            font-weight: 800; 
+            color: #fff; 
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
+            text-align: center; 
+            width: 100%; 
+            white-space: normal; 
+            word-wrap: break-word;
+            word-break: break-all; 
+            line-height: 1.1;
         }
 
-        /* 滚动时的残影效果 */
-        .rolling-text {
-            filter: blur(1px);
-            opacity: 0.8;
-            transform: scale(0.95);
-        }
+        /* 动画状态：出洞 */
+        .mole.up { bottom: 0; transition: bottom 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
-        /* 中奖者的聚光灯效果 */
-        .winner-text {
-            color: #ffd700; /* 土豪金 */
-            text-shadow: 0 0 20px #ffd700, 0 0 40px #ff8c00;
-            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        /* 动画状态：天选之鼠 */
+        .crown { position: absolute; top: 0; font-size: 45px; opacity: 0; transition: all 0.5s; z-index: 10; pointer-events: none; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5)); transform: translateY(20px) scale(0.5); }
+        
+        .hole-container.is-winner {
+            z-index: 50;
+            transform: scale(1.6) translateY(-20px);
         }
-
-        /* 递话筒的专属动画 */
-        .mic-wrapper {
-            margin-top: 15px;
-            font-size: 2rem;
-            color: #fff;
-            text-shadow: none;
-            opacity: 0;
-            transform: translateY(30px) scale(0.5) rotate(-20deg);
-            animation: handMic 0.8s 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        .hole-container.is-winner .mole {
+            bottom: 0;
+            background: var(--gold); 
+            box-shadow: inset -5px -5px 15px rgba(255,140,0,0.5), 0 0 40px rgba(255, 215, 0, 0.8);
         }
-
-        @keyframes popIn {
-            0% { transform: scale(0.5); opacity: 0; }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); opacity: 1; }
+        .hole-container.is-winner .mole-belly { background: rgba(0,0,0,0.1); }
+        .hole-container.is-winner .mole-name { 
+            color: #000; 
+            text-shadow: none; 
+            font-size: 14px; 
         }
+        .hole-container.is-winner .crown { opacity: 1; transform: translateY(-35px) scale(1); }
 
-        @keyframes handMic {
-            0% { transform: translateY(30px) scale(0.5) rotate(-20deg); opacity: 0; }
-            70% { transform: translateY(-10px) scale(1.2) rotate(10deg); opacity: 1; }
-            100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
-        }
+        /* 底部控制台 */
+        .control-panel { position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center; z-index: 100;}
+        .btn-mega { font-size: 2rem; font-weight: 900; letter-spacing: 2px; padding: 18px 60px; border-radius: 50px; background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); border: 4px solid #fff; color: white; cursor: pointer; box-shadow: 0 15px 35px rgba(234, 88, 12, 0.5); transition: all 0.3s; }
+        .btn-mega:hover { transform: translateY(-5px) scale(1.05); box-shadow: 0 20px 40px rgba(234, 88, 12, 0.7); }
+        .btn-mega.stop-mode { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); box-shadow: 0 15px 35px rgba(239, 68, 68, 0.5); }
 
-        /* 以下是原本的管理区样式，保持不变 */
-        .manage-section { padding: 24px; flex-grow: 1; }
-        .input-group { display: flex; gap: 8px; margin-bottom: 20px; }
-        input[type="text"] { flex-grow: 1; padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 8px; outline: none; font-size: 1rem;}
-        input[type="text"]:focus { border-color: var(--primary); }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-draw { background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); color: white; font-size: 1.3rem; padding: 15px 40px; box-shadow: 0 8px 20px rgba(234, 88, 12, 0.4); border-radius: 50px; border: 2px solid #fff;}
-        .btn-draw:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(234, 88, 12, 0.6); }
-        .btn-draw.stop { background: var(--danger); box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4); }
-        .candidate-list { list-style: none; padding: 0; max-height: 300px; overflow-y: auto; }
-        .candidate-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f3f4f6; }
-        .actions { display: flex; gap: 8px; }
-        .btn-sm { padding: 4px 10px; font-size: 0.85rem; border-radius: 4px; }
-        .edit-btn { color: var(--primary); background: #eef2ff; }
-        .del-btn { color: var(--danger); background: #fef2f2; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <div class="draw-section">
-        <div id="display-name">连接服务器中...</div>
-        <button id="draw-btn" class="btn btn-draw" onclick="handleDraw()" disabled>等待数据</button>
-    </div>
+<button id="show-sidebar-btn" onclick="toggleSidebar()">☰ 成员管理</button>
 
-    <div class="manage-section">
-        <h3>成员管理 (<span id="count">0</span>)</h3>
-        <div class="input-group">
-            <input type="text" id="name-input" placeholder="输入姓名..." onkeydown="if(event.key==='Enter')addCandidate()">
-            <button class="btn btn-primary" onclick="addCandidate()">添加</button>
-        </div>
-        <ul id="list" class="candidate-list"></ul>
-        <button class="btn del-btn" style="width: 100%; margin-top: 15px;" onclick="clearAll()">清空所有名单</button>
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <h2>地鼠名册 (<span id="count">0</span>)</h2>
+        <button class="toggle-btn" onclick="toggleSidebar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+        </button>
     </div>
-</div>
+    <div class="manage-area">
+        <div class="input-group">
+            <input type="text" id="name-input" placeholder="录入新地鼠..." onkeydown="if(event.key==='Enter')addCandidate()">
+            <button class="btn btn-add" onclick="addCandidate()">入洞</button>
+        </div>
+        <ul id="list" class="list-wrap"></ul>
+        <button class="btn btn-danger" onclick="clearAll()">赶走所有地鼠</button>
+    </div>
+</aside>
+
+<main class="main-arena">
+    <div class="grass-field" id="grass-field"></div>
+
+    <div class="control-panel">
+        <button id="draw-btn" class="btn-mega" onclick="handleDraw()" disabled>系统加载中</button>
+    </div>
+</main>
 
 <script>
     let candidates = [];
-    let isRolling = false;
-    let timer = null;
+    let isDrawing = false;
+    let whackInterval = null;
 
-    // 从服务器拉取数据
+    const svgEdit = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+    const svgDel = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('collapsed');
+        document.getElementById('show-sidebar-btn').classList.toggle('visible', sidebar.classList.contains('collapsed'));
+    }
+
     async function loadDataFromServer() {
         try {
             const response = await fetch('/api/candidates');
             candidates = await response.json();
-            document.getElementById('display-name').innerText = "准备就绪";
+            document.getElementById('draw-btn').innerText = "开始砸地鼠！";
             document.getElementById('draw-btn').disabled = false;
-            renderList();
+            renderAll();
         } catch (error) {
-            document.getElementById('display-name').innerText = "数据拉取失败";
+            document.getElementById('draw-btn').innerText = "网络断开";
         }
     }
 
-    // 将最新数据推送到服务器
     async function syncDataToServer() {
         try {
-            await fetch('/api/candidates', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ candidates })
-            });
-            renderList();
-        } catch (error) {
-            alert('同步失败！');
-        }
+            await fetch('/api/candidates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidates }) });
+            renderAll();
+        } catch (error) { console.error('同步失败'); }
     }
 
-    // 渲染列表界面
-    function renderList() {
+    function renderAll() {
         document.getElementById('count').innerText = candidates.length;
         const listEl = document.getElementById('list');
+        const grassField = document.getElementById('grass-field');
+        
         listEl.innerHTML = '';
+        grassField.innerHTML = '';
+
         candidates.forEach((name, index) => {
+            // 渲染左侧列表
             const li = document.createElement('li');
-            li.className = 'candidate-item';
-            li.innerHTML = `<span>${name}</span><div class="actions"><button class="btn btn-sm edit-btn" onclick="editCandidate(${index})">改</button><button class="btn btn-sm del-btn" onclick="deleteCandidate(${index})">删</button></div>`;
+            li.className = 'list-item';
+            li.innerHTML = `<span>${name}</span><div class="item-actions"><button onclick="editCandidate(${index})">${svgEdit}</button><button onclick="deleteCandidate(${index})">${svgDel}</button></div>`;
             listEl.appendChild(li);
+
+            // 渲染右侧地鼠洞
+            const hole = document.createElement('div');
+            hole.className = 'hole-container';
+            hole.id = `hole-${index}`;
+            hole.innerHTML = `
+                <div class="crown">👑</div>
+                <div class="dirt-hole"></div>
+                <div class="mole-mask">
+                    <div class="mole" id="mole-${index}">
+                        <div class="mole-eyes"><div class="eye"></div><div class="eye"></div></div>
+                        <div class="mole-nose"></div>
+                        <div class="mole-belly"><div class="mole-name">${name}</div></div>
+                    </div>
+                </div>
+            `;
+            grassField.appendChild(hole);
         });
     }
 
     function addCandidate() { const input = document.getElementById('name-input'); if (input.value.trim()) { candidates.push(input.value.trim()); input.value = ''; syncDataToServer(); } }
     function deleteCandidate(index) { candidates.splice(index, 1); syncDataToServer(); }
     function editCandidate(index) { const newName = prompt("修改姓名：", candidates[index]); if (newName && newName.trim()) { candidates[index] = newName.trim(); syncDataToServer(); } }
-    function clearAll() { if(confirm("确定要清空吗？")) { candidates = []; syncDataToServer(); } }
+    function clearAll() { if(confirm("确定赶走所有地鼠吗？")) { candidates = []; syncDataToServer(); } }
 
     function getSecureRandomIndex(max) {
         const array = new Uint32Array(1);
@@ -164,57 +283,63 @@
         return array[0] % max;
     }
 
-    // 触发炫酷撒花特效的函数
-    function fireConfetti() {
-        var count = 200;
-        var defaults = { origin: { y: 0.7 }, zIndex: 100 };
-        function fire(particleRatio, opts) {
-            confetti(Object.assign({}, defaults, opts, { particleCount: Math.floor(count * particleRatio) }));
-        }
-        fire(0.25, { spread: 26, startVelocity: 55 });
-        fire(0.2, { spread: 60 });
-        fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
-        fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
-        fire(0.1, { spread: 120, startVelocity: 45 });
+    function fireBigConfetti() {
+        const duration = 3000;
+        const end = Date.now() + duration;
+        (function frame() {
+            confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#ffd700', '#fbbf24', '#ffffff'] });
+            confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#ffd700', '#fbbf24', '#ffffff'] });
+            if (Date.now() < end) requestAnimationFrame(frame);
+        }());
     }
 
-    // 抽奖逻辑
+    // 打地鼠核心逻辑
     function handleDraw() {
-        if (candidates.length < 1) return alert("名单为空，请先添加成员！");
+        if (candidates.length < 1) return alert("草地上没有地鼠，请先录入名单！");
         const btn = document.getElementById('draw-btn');
-        const display = document.getElementById('display-name');
 
-        if (!isRolling) {
-            isRolling = true;
-            btn.innerText = "停止并揭晓！";
-            btn.classList.add('stop');
+        if (!isDrawing) {
+            isDrawing = true;
+            btn.innerText = "锁定天选地鼠！";
+            btn.classList.add('stop-mode');
             
-            // 快速滚动时的残影效果
-            display.className = 'rolling-text';
-            
-            timer = setInterval(() => {
-                const randomName = candidates[Math.floor(Math.random() * candidates.length)];
-                display.innerText = randomName;
-            }, 40);
+            // 自动折叠侧边栏
+            if (!document.getElementById('sidebar').classList.contains('collapsed')) toggleSidebar();
+
+            // 清除上一轮的获胜状态
+            document.querySelectorAll('.hole-container').forEach(c => c.classList.remove('is-winner'));
+
+            // 地鼠狂舞出洞逻辑
+            whackInterval = setInterval(() => {
+                // 先让所有地鼠回洞
+                document.querySelectorAll('.mole').forEach(m => m.classList.remove('up'));
+                
+                // 每次随机让 20%~40% 的地鼠出洞，制造群魔乱舞的感觉
+                const popCount = Math.max(1, Math.floor(candidates.length * (Math.random() * 0.2 + 0.2)));
+                for(let i=0; i<popCount; i++) {
+                    const r = Math.floor(Math.random() * candidates.length);
+                    document.getElementById(`mole-${r}`).classList.add('up');
+                }
+            }, 350); // 每 350 毫秒刷新一次状态
+
         } else {
-            isRolling = false;
-            clearInterval(timer);
-            btn.innerText = "再次抽奖";
-            btn.classList.remove('stop');
+            isDrawing = false;
+            clearInterval(whackInterval);
+            btn.innerText = "再抽一次";
+            btn.classList.remove('stop-mode');
             
+            // 所有地鼠先缩回洞里（制造悬念Buildup）
+            document.querySelectorAll('.mole').forEach(m => m.classList.remove('up'));
+
+            // 绝对随机锁定结果
             const winnerIndex = getSecureRandomIndex(candidates.length);
-            const winner = candidates[winnerIndex];
             
-            // 清除残影类名
-            display.className = '';
-            // 注入中奖者的 HTML：带发光特效的名字 + 递话筒动画
-            display.innerHTML = `
-                <div class="winner-text">👑 ${winner} 👑</div>
-                <div class="mic-wrapper">🎤 恭喜下周的主持人！</div>
-            `;
-            
-            // 触发全屏撒花
-            fireConfetti();
+            // 延迟半秒钟，天选地鼠破土而出
+            setTimeout(() => {
+                const winnerContainer = document.getElementById(`hole-${winnerIndex}`);
+                winnerContainer.classList.add('is-winner'); // CSS 会处理变金、放大、戴皇冠
+                fireBigConfetti();
+            }, 600);
         }
     }
 
